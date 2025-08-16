@@ -1,6 +1,6 @@
 # [Orbitals](https://pvorselaars.github.io/orbitals/)
 
-A simple WebGL app built with **HTML**, **CSS**, and **TypeScript** that fetches satellite GP (General Perturbations) data from [Celestrak](https://www.celestrak.org/) and visualizes it in 3D.
+A simple WebGL app built with **HTML**, **CSS**, and **TypeScript** that fetches satellite GP (General Perturbations) data from [Celestrak](https://celestrak.org/) and visualizes it in 3D.
 
 * 💾 Fetches and caches GP data from Celestrak.
 * 🖌️ Visualizes satellite orbits in a WebGL 3D scene.
