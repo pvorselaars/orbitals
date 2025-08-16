@@ -1,0 +1,36 @@
+# Orbitals
+
+A simple WebGL app built with **HTML**, **CSS**, and **TypeScript** that fetches satellite GP (General Perturbations) data from [Celestrak](https://www.celestrak.org/) and visualizes it in 3D.
+
+* 💾 Fetches and caches GP data from Celestrak.
+* 🖌️ Visualizes satellite orbits in a WebGL 3D scene.
+* 🪶 Lightweight, no external frameworks required.
+
+## 🚀 Getting started
+
+```bash
+git clone https://github.com/pvorselaars/orbitals.git
+cd orbitals
+
+npm install
+npm run build
+npm run serve
+```
+
+## ✅ Roadmap
+
+- [ ] Interactive UI
+- [ ] Camera controls
+- [ ] Orbit propagation
+
+## 📄 License
+
+This project is licensed under the MIT License. See [LICENSE](./LICENSE) for details.
+
+## 🤝 Contributing
+
+Contributions, suggestions, and issues are welcome. Please open a PR or file an issue in GitHub.
+
+## 📬 Contact
+
+Questions? Reach out on GitHub or submit an issue.

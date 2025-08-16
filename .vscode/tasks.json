@@ -1,0 +1,31 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "build",
+      "type": "npm",
+      "script": "build",
+      "problemMatcher": ["$tsc"],
+      "group": {
+        "kind": "build",
+        "isDefault": true
+      }
+    },
+    {
+      "label": "serve",
+      "type": "shell",
+      "command": "npm run dev; live-server dist --no-browser",
+      "isBackground": true,
+      "problemMatcher": ["$tsc-watch"],
+    },
+    {
+      "label": "terminate",
+      "type": "shell",
+      "command": "pkill -f 'tsc.*--watch'; pkill -f 'live-server'",
+      "problemMatcher": [],
+      "windows": {
+        "command": "taskkill /F /IM node.exe /T"
+      }
+    }
+]
+}
