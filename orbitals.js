@@ -1,18 +1,22 @@
-import { getPoints } from "./gp.js";
+import { getPositions } from "./gp.js";
 const canvas = document.getElementById('orbitals');
 const gl = canvas.getContext('webgl2');
 if (!gl)
     throw new Error('WebGL not supported');
 const vertSrc = `#version 300 es
-    in vec2 aPos;
+    in vec3 aPosition;
+
     uniform float uPointSize; // in pixels
+    uniform mat4 uProjection;
+
     void main() {
-        gl_Position = vec4(aPos, 0.0, 1.0);
+        gl_Position = uProjection * vec4(aPosition.xy, 0, 1.0);
         gl_PointSize = uPointSize; // pixels
     }`;
 const fragSrc = `#version 300 es
     precision mediump float;
     out vec4 outColor;
+
     void main() {
         vec2 p = gl_PointCoord * 2.0 - 1.0;
         float d = dot(p, p);
@@ -41,31 +45,52 @@ function createProgram(vsSource, fsSource) {
     return prog;
 }
 const program = createProgram(vertSrc, fragSrc);
-const points = await getPoints();
-function normalizePoints() {
-    let maxMag = 0;
-    for (let i = 0; i < points.length; i++) {
-        const x = points[i * 2];
-        const y = points[i * 2 + 1];
-        const mag = Math.sqrt(x * x + y * y);
-        if (mag > maxMag)
-            maxMag = mag;
+let positions = await getPositions();
+function findBounds(points) {
+    const aspect = canvas.width / canvas.height;
+    let [minX, maxX, minY, maxY] = [Infinity, -Infinity, Infinity, -Infinity];
+    for (const [x, y] of points) {
+        if (x < minX)
+            minX = x;
+        if (x > maxX)
+            maxX = x;
+        if (y < minY)
+            minY = y;
+        if (y > maxY)
+            maxY = y;
     }
-    if (maxMag < 1e-6)
-        maxMag = 1e-6;
-    for (let i = 0; i < points.length; i++) {
-        points[i * 2] /= maxMag;
-        points[i * 2 + 1] /= maxMag;
-    }
+    return [minX, minY, maxX, maxY];
 }
-normalizePoints();
+const [minX, minY, maxX, maxY] = findBounds(positions);
+function orthoMatrix(left, right, bottom, top, near, far, padding) {
+    const rl = right - left || 1;
+    const tb = top - bottom || 1;
+    const fn = far - near || 2;
+    const paddedMinX = left - rl * padding;
+    const paddedMaxX = right + rl * padding;
+    const paddedMinY = bottom - tb * padding;
+    const paddedMaxY = top + tb * padding;
+    const rlPadded = paddedMaxX - paddedMinX;
+    const tbPadded = paddedMaxY - paddedMinY;
+    return new Float32Array([
+        2 / rlPadded, 0, 0, 0,
+        0, 2 / tbPadded, 0, 0,
+        0, 0, -2 / fn, 0,
+        -(paddedMaxX + paddedMinX) / rlPadded, -(paddedMaxY + paddedMinY) / tbPadded, -(far + near) / fn, 1
+    ]);
+}
+const projectionMatrix = orthoMatrix(minX, maxX, minY, maxY, -1, 1, 0.05);
+const points = new Float32Array(positions.flat());
 const vbo = gl.createBuffer();
 gl.bindBuffer(gl.ARRAY_BUFFER, vbo);
 gl.useProgram(program);
-const aPosLoc = gl.getAttribLocation(program, 'aPos');
+const aPositionLoc = gl.getAttribLocation(program, 'aPosition');
 const uPointSizeLoc = gl.getUniformLocation(program, 'uPointSize');
-gl.enableVertexAttribArray(aPosLoc);
-gl.vertexAttribPointer(aPosLoc, 2, gl.FLOAT, false, 0, 0);
+const uProjectionLoc = gl.getUniformLocation(program, 'uProjection');
+gl.enableVertexAttribArray(aPositionLoc);
+gl.vertexAttribPointer(aPositionLoc, 3, gl.FLOAT, false, 0, 0);
+gl.bufferData(gl.ARRAY_BUFFER, points, gl.STATIC_DRAW);
+gl.uniformMatrix4fv(uProjectionLoc, false, projectionMatrix);
 function resize() {
     const dpr = Math.max(1, window.devicePixelRatio || 1);
     const w = Math.floor(canvas.clientWidth * dpr);
@@ -80,11 +105,10 @@ window.addEventListener('resize', resize);
 resize();
 const px = (window.devicePixelRatio || 1) * 6.0;
 function frame(now) {
-    gl.bufferData(gl.ARRAY_BUFFER, points, gl.STATIC_DRAW);
     gl.clearColor(0, 0, 0, 1);
     gl.clear(gl.COLOR_BUFFER_BIT);
     gl.uniform1f(uPointSizeLoc, px);
-    gl.drawArrays(gl.POINTS, 0, points.length / 2);
+    gl.drawArrays(gl.POINTS, 0, points.length / 3);
     requestAnimationFrame(frame);
 }
 requestAnimationFrame(frame);

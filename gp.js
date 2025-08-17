@@ -1,16 +1,5 @@
+import { multiply } from "./tensor.js";
 const CACHE_DURATION = 1000 * 60 * 60 * 24;
-function multiply(m, v) {
-    const [x, y, z] = v;
-    return [
-        m[0][0] * x + m[0][1] * y + m[0][2] * z,
-        m[1][0] * x + m[1][1] * y + m[1][2] * z,
-        m[2][0] * x + m[2][1] * y + m[2][2] * z
-    ];
-}
-function ortho(v) {
-    const [x, y] = v;
-    return [x, y];
-}
 const minutesPerDay = 1440;
 const secondsPerDay = minutesPerDay * 60;
 const mu = 398600.4418;
@@ -86,15 +75,15 @@ async function getGpData() {
     localStorage.setItem('data', JSON.stringify({ data, timestamp: Date.now() }));
     return data;
 }
-export async function getPoints() {
+export async function getPositions() {
     const cached = getCache('satellites');
     if (cached) {
-        const positions = cached.flatMap(o => ortho(o.position));
-        return new Float32Array(positions);
+        const positions = cached.map(o => o.position);
+        return positions;
     }
     const elements = await getGpData();
-    const objects = elements.map(e => sgp(e));
-    const positions = objects.flatMap(o => ortho(o.position));
-    localStorage.setItem('satellites', JSON.stringify({ data: objects, timestamp: Date.now() }));
-    return new Float32Array(positions);
+    const satellites = elements.map(e => sgp(e));
+    const positions = satellites.map(o => o.position);
+    localStorage.setItem('satellites', JSON.stringify({ data: satellites, timestamp: Date.now() }));
+    return positions;
 }
