@@ -1,5 +1,5 @@
 import { multiply } from "./tensor.js";
-const CACHE_DURATION = 1000 * 60 * 60 * 24;
+import { getCache, saveCache } from "./cache.js";
 const minutesPerDay = 1440;
 const secondsPerDay = minutesPerDay * 60;
 const mu = 398600.4418;
@@ -31,12 +31,13 @@ function perifocalToGeocentric(v, incl, raan, argp) {
     ];
     return multiply(mat, v);
 }
-function sgp(element) {
+export function sgp(element, delta_t) {
     const mm = element.MEAN_MOTION * Math.PI * 2 / secondsPerDay;
     const a = Math.pow(mu / (mm * mm), 1 / 3);
-    const mo = element.MEAN_ANOMALY * Math.PI / 180;
+    const m0 = element.MEAN_ANOMALY * Math.PI / 180;
+    const m = m0 + mm * delta_t;
     const e = element.ECCENTRICITY;
-    const E = kepler(mo, e);
+    const E = kepler(m, e);
     const cosE = Math.cos(E);
     const sinE = Math.sin(E);
     const fac = Math.sqrt(1 - e * e);
@@ -55,35 +56,14 @@ function sgp(element) {
     const v_eci = perifocalToGeocentric(vp, inclination, raan, argp);
     return { position: r_eci, velocity: v_eci, name: element.OBJECT_NAME, id: element.OBJECT_ID };
 }
-function getCache(key) {
-    const cached = localStorage.getItem(key);
-    if (!cached)
-        return null;
-    const cache = JSON.parse(cached);
-    if (Date.now() - cache.timestamp < CACHE_DURATION) {
-        return cache.data;
-    }
-}
-async function getGpData() {
-    const cached = getCache('data');
-    if (cached)
-        return cached;
+export async function getElements() {
+    let cache = getCache('elements');
+    if (cache)
+        return cache;
     const response = await fetch('https://celestrak.com/NORAD/elements/gp.php?GROUP=stations&FORMAT=json');
     if (!response.ok)
         throw new Error('Failed to fetch data');
     const data = await response.json();
-    localStorage.setItem('data', JSON.stringify({ data, timestamp: Date.now() }));
-    return data;
-}
-export async function getPositions() {
-    const cached = getCache('satellites');
-    if (cached) {
-        const positions = cached.map(o => o.position);
-        return positions;
-    }
-    const elements = await getGpData();
-    const satellites = elements.map(e => sgp(e));
-    const positions = satellites.map(o => o.position);
-    localStorage.setItem('satellites', JSON.stringify({ data: satellites, timestamp: Date.now() }));
-    return positions;
+    cache = saveCache('elements', data);
+    return cache;
 }
