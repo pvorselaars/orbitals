@@ -21,9 +21,10 @@ npm run serve
 
 ## ✅ Roadmap
 
+- [x] Orbit propagation
+- [ ] Orbit visualization
 - [ ] Interactive UI
 - [ ] Camera controls
-- [ ] Orbit propagation
 
 ## 📄 License
 

@@ -1,6 +1,7 @@
 import { vector3, matrix3, multiply } from "./tensor.js";
+import { getCache, saveCache, Cache } from "./cache.js";
 
-type GpElement = {
+export type GpElement = {
   OBJECT_NAME: string;
   OBJECT_ID: string;
   EPOCH: string;
@@ -19,19 +20,13 @@ type GpElement = {
   CLASSIFICATION_TYPE: "U" | "C" | "S";
 }
 
-type Satellite = {
+export type Satellite = {
   name: string;
   id: string;
   position: vector3;
   velocity: vector3;
 }
 
-type Cache<T> = {
-  data: T;
-  timestamp: number;
-}
-
-const CACHE_DURATION = 1000 * 60 * 60 * 24; // 1 day
 
 const minutesPerDay = 1440;
 const secondsPerDay = minutesPerDay * 60;
@@ -72,7 +67,7 @@ function perifocalToGeocentric(v: vector3, incl: number, raan: number, argp: num
   return multiply(mat, v);
 }
 
-function sgp(element: GpElement): Satellite{
+export function sgp(element: GpElement, delta_t: number): Satellite{
 
   // Calculate semimajor axis
   const mm = element.MEAN_MOTION * Math.PI * 2 / secondsPerDay; // convert rev/day to rad/s
@@ -80,9 +75,10 @@ function sgp(element: GpElement): Satellite{
 
   // TODO: determine near-earth drag constants
 
-  const mo = element.MEAN_ANOMALY * Math.PI / 180;
+  const m0 = element.MEAN_ANOMALY * Math.PI / 180;
+  const m = m0 + mm * delta_t;
   const e = element.ECCENTRICITY;
-  const E = kepler(mo, e); // eccentric anomaly in radians
+  const E = kepler(m, e); // eccentric anomaly in radians
 
   // perifocal position
   const cosE = Math.cos(E);
@@ -110,22 +106,12 @@ function sgp(element: GpElement): Satellite{
   return { position: r_eci, velocity: v_eci, name: element.OBJECT_NAME, id: element.OBJECT_ID } as Satellite;
 }
 
-function getCache<T>(key: string) : T | null {
-  const cached = localStorage.getItem(key);
 
-  if (!cached) return null;
-
-  const cache: Cache<T> = JSON.parse(cached);
-  if (Date.now() - cache.timestamp < CACHE_DURATION) {
-    return cache.data;
-  }
-}
-
-async function getGpData(): Promise<GpElement[]> {
+export async function getElements(): Promise<Cache<GpElement[]>> {
   
-  const cached = getCache<GpElement[]>('data');
+  let cache = getCache<GpElement[]>('elements');
 
-  if (cached) return cached;
+  if (cache) return cache;
 
   // only stations for now
   const response = await fetch('https://celestrak.com/NORAD/elements/gp.php?GROUP=stations&FORMAT=json');
@@ -134,25 +120,7 @@ async function getGpData(): Promise<GpElement[]> {
 
   const data = await response.json() as GpElement[];
 
-  localStorage.setItem('data', JSON.stringify({ data, timestamp: Date.now() }));
+  cache = saveCache<GpElement[]>('elements', data);
   
-  return data;
-}
-
-export async function getPositions(): Promise<vector3[]> {
-
-  const cached = getCache<Satellite[]>('satellites');
-
-  if (cached) {
-    const positions = cached.map(o => o.position);
-    return positions;
-  }
-
-  const elements = await getGpData();
-  const satellites = elements.map(e => sgp(e))
-  const positions = satellites.map(o => o.position);
-
-  localStorage.setItem('satellites', JSON.stringify({ data: satellites, timestamp: Date.now() }));
-
-  return positions;
+  return cache;
 }
