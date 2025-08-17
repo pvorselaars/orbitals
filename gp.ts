@@ -64,7 +64,7 @@ function kepler(M: number, e: number, eps = 1e-8): number {
   return E;
 }
 
-function sgp4Init(element: GpElement): Satellite {
+export function sgp4Init(element: GpElement): Satellite {
 
   // Reconstruct original mean motion and semimajor axis
   const n0 = element.MEAN_MOTION * Math.PI * 2 / secondsPerDay; // convert rev/day to rad/s
@@ -165,23 +165,4 @@ export function sgp4(satellite: Satellite, delta_t: number): Satellite{
   satellite.velocity = vp;
 
   return satellite as Satellite;
-}
-
-export async function getSatellites(): Promise<Cache<Satellite[]>> {
-  
-  let cache = getCache<Satellite[]>('satellites');
-
-  if (cache) return cache;
-
-  // only stations for now
-  const response = await fetch('https://celestrak.com/NORAD/elements/gp.php?GROUP=stations&FORMAT=json');
-
-  if (!response.ok) throw new Error('Failed to fetch data');
-
-  const elements = await response.json() as GpElement[];
-  const satellites = elements.map(e => sgp4Init(e));
-
-  cache = saveCache<Satellite[]>('satellites', satellites);
-  
-  return cache;
 }
