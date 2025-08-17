@@ -1,3 +1,19 @@
+export function rotateZ(angle, v) {
+    const c = Math.cos(angle);
+    const s = Math.sin(angle);
+    const R = [[c, -s, 0],
+        [s, c, 0],
+        [0, 0, 1]];
+    return multiply(R, v);
+}
+export function rotateX(angle, v) {
+    const c = Math.cos(angle);
+    const s = Math.sin(angle);
+    const R = [[1, 0, 0],
+        [0, c, -s],
+        [0, s, c]];
+    return multiply(R, v);
+}
 export function multiply(m, v) {
     const [x, y, z] = v;
     return [

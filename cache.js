@@ -27,7 +27,7 @@ export function getCache(key) {
     if (!cached)
         return null;
     const cache = JSON.parse(cached);
-    return new Cache(cache.data, cache.timestampe);
+    return new Cache(cache.data, cache.timestamp);
 }
 export function saveCache(key, data) {
     const t = Date.now();
