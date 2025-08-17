@@ -1,3 +1,5 @@
+import { vector3, matrix3, multiply } from "./tensor.js";
+
 type GpElement = {
   OBJECT_NAME: string;
   OBJECT_ID: string;
@@ -30,24 +32,6 @@ type Cache<T> = {
 }
 
 const CACHE_DURATION = 1000 * 60 * 60 * 24; // 1 day
-
-type vector3 = [number, number, number];
-type vector2 = [number, number];
-type matrix3 = [vector3, vector3, vector3];
-
-function multiply(m: matrix3, v: vector3): vector3 {
-  const [x, y, z] = v;
-  return [
-    m[0][0] * x + m[0][1] * y + m[0][2] * z,
-    m[1][0] * x + m[1][1] * y + m[1][2] * z,
-    m[2][0] * x + m[2][1] * y + m[2][2] * z
-  ];
-}
-
-function ortho(v: vector3): vector2 {
-  const [x, y] = v;
-  return [x, y];
-}
 
 const minutesPerDay = 1440;
 const secondsPerDay = minutesPerDay * 60;
@@ -155,20 +139,20 @@ async function getGpData(): Promise<GpElement[]> {
   return data;
 }
 
-export async function getPoints(): Promise<Float32Array> {
+export async function getPositions(): Promise<vector3[]> {
 
   const cached = getCache<Satellite[]>('satellites');
 
   if (cached) {
-    const positions = cached.flatMap(o => ortho(o.position));
-    return new Float32Array(positions);
+    const positions = cached.map(o => o.position);
+    return positions;
   }
 
   const elements = await getGpData();
-  const objects = elements.map(e => sgp(e))
-  const positions = objects.flatMap(o => ortho(o.position));
+  const satellites = elements.map(e => sgp(e))
+  const positions = satellites.map(o => o.position);
 
-  localStorage.setItem('satellites', JSON.stringify({ data: objects, timestamp: Date.now() }));
+  localStorage.setItem('satellites', JSON.stringify({ data: satellites, timestamp: Date.now() }));
 
-  return new Float32Array(positions);
+  return positions;
 }
