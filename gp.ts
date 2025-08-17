@@ -1,4 +1,3 @@
-import { getCache, saveCache, Cache } from "./cache.js";
 import { vector3 } from "./tensor.js";
 
 export type GpElement = {

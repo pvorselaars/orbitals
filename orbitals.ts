@@ -1,5 +1,4 @@
 import { Satellite, sgp4, sgp4Init, GpElement } from "./gp.js";
-import { Cache } from "./cache.js";
 import { vector3, rotateX, rotateZ } from "./tensor.js";
 
 const canvas = document.getElementById('orbitals') as HTMLCanvasElement;
@@ -116,6 +115,9 @@ export async function getSatellites(interval = 120 * 60 * 1000) {
     try {
         // only stations for now
         const response = await fetch("https://celestrak.com/NORAD/elements/gp.php?GROUP=stations&FORMAT=json");
+
+        if (!response.ok) throw Error(response.statusText)
+
         const elements = await response.json() as GpElement[];
         satellites = elements.map(e => sgp4Init(e));
         orbitVertices = generateOrbitsVertices(satellites, numberOfSegments);
