@@ -25,9 +25,9 @@ export function getCache<T>(key: string) : Cache<T> | null {
 
   if (!cached) return null;
 
-  const cache = JSON.parse(cached) as { data: T; timestampe: number};
+  const cache = JSON.parse(cached) as { data: T; timestamp: number};
 
-  return new Cache<T>(cache.data, cache.timestampe);
+  return new Cache<T>(cache.data, cache.timestamp);
 }
 
 export function saveCache<T>(key: string, data: any) : Cache<T> {
