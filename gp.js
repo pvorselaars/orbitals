@@ -1,4 +1,3 @@
-import { getCache, saveCache } from "./cache.js";
 const minutesPerDay = 1440;
 const secondsPerDay = minutesPerDay * 60;
 const mu = 398600.4418;
@@ -20,7 +19,7 @@ function kepler(M, e, eps = 1e-8) {
     }
     return E;
 }
-function sgp4Init(element) {
+export function sgp4Init(element) {
     const n0 = element.MEAN_MOTION * Math.PI * 2 / secondsPerDay;
     const a1 = Math.pow(mu / (n0 * n0), 1 / 3);
     const inclination = element.INCLINATION * (Math.PI / 180);
@@ -85,16 +84,4 @@ export function sgp4(satellite, delta_t) {
     satellite.position = rp;
     satellite.velocity = vp;
     return satellite;
-}
-export async function getSatellites() {
-    let cache = getCache('satellites');
-    if (cache)
-        return cache;
-    const response = await fetch('https://celestrak.com/NORAD/elements/gp.php?GROUP=stations&FORMAT=json');
-    if (!response.ok)
-        throw new Error('Failed to fetch data');
-    const elements = await response.json();
-    const satellites = elements.map(e => sgp4Init(e));
-    cache = saveCache('satellites', satellites);
-    return cache;
 }

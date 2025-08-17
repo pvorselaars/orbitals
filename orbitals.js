@@ -1,5 +1,4 @@
-import { getSatellites, sgp4 } from "./gp.js";
-import { Cache } from "./cache.js";
+import { sgp4, sgp4Init } from "./gp.js";
 import { rotateX, rotateZ } from "./tensor.js";
 const canvas = document.getElementById('orbitals');
 const gl = canvas.getContext('webgl2');
@@ -92,6 +91,38 @@ function resize() {
 }
 window.addEventListener('resize', resize);
 resize();
+export async function getSatellites(interval = 120 * 60 * 1000) {
+    try {
+        const response = await fetch("https://celestrak.com/NORAD/elements/gp.php?GROUP=stations&FORMAT=json");
+        const elements = await response.json();
+        satellites = elements.map(e => sgp4Init(e));
+        orbitVertices = generateOrbitsVertices(satellites, numberOfSegments);
+        gl.bindBuffer(gl.ARRAY_BUFFER, orbitsVBO);
+        gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(orbitVertices), gl.STATIC_DRAW);
+        let [minX, maxX, minY, maxY] = findBounds(orbitVertices);
+        const aspect = canvas.clientWidth / canvas.clientHeight;
+        const width = maxX - minX;
+        const height = maxY - minY;
+        if (width / height > aspect) {
+            const dy = (width / aspect - height) / 2;
+            minY -= dy;
+            maxY += dy;
+        }
+        else {
+            const dx = (height * aspect - width) / 2;
+            minX -= dx;
+            maxX += dx;
+        }
+        const projectionMatrix = orthoMatrix(minX, maxX, minY, maxY, -1, 1, 0.05);
+        gl.uniformMatrix4fv(uProjectionLoc, false, projectionMatrix);
+    }
+    catch (err) {
+        console.error("Failed to fetch satellites:", err);
+    }
+    finally {
+        setTimeout(() => getSatellites(interval), interval);
+    }
+}
 function generateOrbitsVertices(satellites, numberOfSegments = 16) {
     const vertices = [];
     for (const satellite of satellites) {
@@ -135,22 +166,12 @@ const uColorLoc = gl.getUniformLocation(program, 'uColor');
 gl.enableVertexAttribArray(aPositionLoc);
 const px = (window.devicePixelRatio || 1) * 6.0;
 gl.clearColor(0, 0, 0, 1);
-let satellites = new Cache([], 0);
-let orbitVertices;
 const numberOfSegments = 256;
+let satellites = [];
+let orbitVertices = [];
+getSatellites();
 function frame(now) {
-    if (satellites.invalid()) {
-        getSatellites().then(s => {
-            satellites = s;
-            orbitVertices = generateOrbitsVertices(satellites.data, numberOfSegments);
-            gl.bindBuffer(gl.ARRAY_BUFFER, orbitsVBO);
-            gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(orbitVertices), gl.STATIC_DRAW);
-            const [minX, maxX, minY, maxY] = findBounds(orbitVertices);
-            const projectionMatrix = orthoMatrix(minX, maxX, minY, maxY, -1, 1, 0.05);
-            gl.uniformMatrix4fv(uProjectionLoc, false, projectionMatrix);
-        });
-    }
-    const satVertices = generateSatelliteVertices(satellites.data, Date.now());
+    const satVertices = generateSatelliteVertices(satellites, Date.now());
     gl.bindBuffer(gl.ARRAY_BUFFER, satVBO);
     gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(satVertices), gl.DYNAMIC_DRAW);
     gl.clear(gl.COLOR_BUFFER_BIT);
@@ -158,7 +179,7 @@ function frame(now) {
     gl.vertexAttribPointer(aPositionLoc, 3, gl.FLOAT, false, 0, 0);
     gl.uniform4f(uColorLoc, 1.0, 1.0, 1.0, 0.1);
     let offset = 0;
-    for (const satellite of satellites.data) {
+    for (const satellite of satellites) {
         gl.drawArrays(gl.LINE_STRIP, offset, numberOfSegments + 1);
         offset += numberOfSegments + 1;
     }
@@ -166,7 +187,7 @@ function frame(now) {
     gl.vertexAttribPointer(aPositionLoc, 3, gl.FLOAT, false, 0, 0);
     gl.uniform1f(uPointSizeLoc, px);
     gl.uniform4f(uColorLoc, 0.0, 0.85, 1.0, 1.0);
-    gl.drawArrays(gl.POINTS, 0, satellites.data.length);
+    gl.drawArrays(gl.POINTS, 0, satellites.length);
     requestAnimationFrame(frame);
 }
 requestAnimationFrame(frame);
