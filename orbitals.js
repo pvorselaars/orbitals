@@ -91,13 +91,22 @@ function resize() {
 }
 window.addEventListener('resize', resize);
 resize();
-export async function getSatellites(interval = 120 * 60 * 1000) {
+export async function getSatellites(interval = 2 * 60 * 60 * 1000) {
     try {
-        const response = await fetch("https://celestrak.com/NORAD/elements/gp.php?GROUP=stations&FORMAT=json");
-        if (!response.ok)
-            throw Error(response.statusText);
-        const elements = await response.json();
-        satellites = elements.map(e => sgp4Init(e));
+        const data = localStorage.getItem("data");
+        const fetchedAt = localStorage.getItem("timestamp");
+        if (data && fetchedAt && Date.now() - Number(fetchedAt) < interval) {
+            satellites = JSON.parse(data);
+        }
+        else {
+            const response = await fetch("https://celestrak.org/NORAD/elements/gp.php?GROUP=stations&FORMAT=json", { cache: "default" });
+            if (!response.ok)
+                throw Error(response.statusText);
+            const elements = await response.json();
+            satellites = elements.map(e => sgp4Init(e));
+            localStorage.setItem("data", JSON.stringify(satellites));
+            localStorage.setItem("timestamp", Date.now().toString());
+        }
         orbitVertices = generateOrbitsVertices(satellites, numberOfSegments);
         gl.bindBuffer(gl.ARRAY_BUFFER, orbitsVBO);
         gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(orbitVertices), gl.STATIC_DRAW);
