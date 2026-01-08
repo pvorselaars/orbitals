@@ -22,3 +22,7 @@ export function multiply(m, v) {
         m[2][0] * x + m[2][1] * y + m[2][2] * z
     ];
 }
+export function magnitude(v) {
+    const [x, y, z] = v;
+    return Math.sqrt(x * x + y * y + z * z);
+}

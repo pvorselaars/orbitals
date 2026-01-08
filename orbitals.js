@@ -1,6 +1,7 @@
 import { sgp4, sgp4Init } from "./gp.js";
-import { rotateX, rotateZ } from "./tensor.js";
-const canvas = document.getElementById('orbitals');
+import { rotateX, rotateZ, magnitude } from "./tensor.js";
+const labelContainer = document.body.appendChild(document.createElement("div"));
+const canvas = document.body.appendChild(document.createElement("canvas"));
 const gl = canvas.getContext('webgl2');
 if (!gl)
     throw new Error('WebGL not supported');
@@ -44,7 +45,6 @@ function createProgram(vsSource, fsSource) {
     }
     return prog;
 }
-const program = createProgram(vertSrc, fragSrc);
 function findBounds(points) {
     let minX = Infinity, maxX = -Infinity;
     let minY = Infinity, maxY = -Infinity;
@@ -60,7 +60,7 @@ function findBounds(points) {
         minZ = Math.min(minZ, z);
         maxZ = Math.max(maxZ, z);
     }
-    return [minX, maxX, minY, maxY, minZ, minY];
+    return [minX, maxX, minY, maxY, minZ, maxZ];
 }
 function orthoMatrix(left, right, bottom, top, near, far, padding) {
     const rl = right - left || 1;
@@ -79,6 +79,34 @@ function orthoMatrix(left, right, bottom, top, near, far, padding) {
         -(paddedMaxX + paddedMinX) / rlPadded, -(paddedMaxY + paddedMinY) / tbPadded, -(far + near) / fn, 1
     ]);
 }
+function worldToScreen(pos, projectionMatrix) {
+    const x = pos[0], y = pos[1], z = pos[2];
+    const clipX = projectionMatrix[0] * x + projectionMatrix[4] * y + projectionMatrix[12];
+    const clipY = projectionMatrix[1] * x + projectionMatrix[5] * y + projectionMatrix[13];
+    const clipW = projectionMatrix[3] * x + projectionMatrix[7] * y + projectionMatrix[15];
+    const ndcX = clipX / clipW;
+    const ndcY = clipY / clipW;
+    const screenX = (ndcX * 0.5 + 0.5) * canvas.clientWidth;
+    const screenY = (ndcY * -0.5 + 0.5) * canvas.clientHeight;
+    return [screenX, screenY];
+}
+function createProjectionMatrix() {
+    const aspect = canvas.clientWidth / canvas.clientHeight;
+    const width = maxX - minX;
+    const height = maxY - minY;
+    if (width / height > aspect) {
+        const dy = (width / aspect - height) / 2;
+        minY -= dy;
+        maxY += dy;
+    }
+    else {
+        const dx = (height * aspect - width) / 2;
+        minX -= dx;
+        maxX += dx;
+    }
+    projectionMatrix = orthoMatrix(minX, maxX, minY, maxY, -1, 1, 0.05);
+    gl.uniformMatrix4fv(uProjectionLoc, false, projectionMatrix);
+}
 function resize() {
     const dpr = Math.max(1, window.devicePixelRatio || 1);
     const w = Math.floor(canvas.clientWidth * dpr);
@@ -88,9 +116,9 @@ function resize() {
         canvas.height = h;
     }
     gl.viewport(0, 0, gl.drawingBufferWidth, gl.drawingBufferHeight);
+    createProjectionMatrix();
 }
 window.addEventListener('resize', resize);
-resize();
 export async function getSatellites(interval = 2 * 60 * 60 * 1000) {
     try {
         const data = localStorage.getItem("data");
@@ -110,22 +138,8 @@ export async function getSatellites(interval = 2 * 60 * 60 * 1000) {
         orbitVertices = generateOrbitsVertices(satellites, numberOfSegments);
         gl.bindBuffer(gl.ARRAY_BUFFER, orbitsVBO);
         gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(orbitVertices), gl.STATIC_DRAW);
-        let [minX, maxX, minY, maxY] = findBounds(orbitVertices);
-        const aspect = canvas.clientWidth / canvas.clientHeight;
-        const width = maxX - minX;
-        const height = maxY - minY;
-        if (width / height > aspect) {
-            const dy = (width / aspect - height) / 2;
-            minY -= dy;
-            maxY += dy;
-        }
-        else {
-            const dx = (height * aspect - width) / 2;
-            minX -= dx;
-            maxX += dx;
-        }
-        const projectionMatrix = orthoMatrix(minX, maxX, minY, maxY, -1, 1, 0.05);
-        gl.uniformMatrix4fv(uProjectionLoc, false, projectionMatrix);
+        [minX, maxX, minY, maxY] = findBounds(orbitVertices);
+        createProjectionMatrix();
     }
     catch (err) {
         console.error("Failed to fetch satellites:", err);
@@ -165,6 +179,7 @@ function generateSatelliteVertices(satellites, t) {
     ;
     return vertices;
 }
+const program = createProgram(vertSrc, fragSrc);
 const orbitsVBO = gl.createBuffer();
 const satVBO = gl.createBuffer();
 gl.useProgram(program);
@@ -178,27 +193,49 @@ gl.enableVertexAttribArray(aPositionLoc);
 const px = (window.devicePixelRatio || 1) * 6.0;
 gl.clearColor(0, 0, 0, 1);
 const numberOfSegments = 256;
+let minX, maxX, minY, maxY;
 let satellites = [];
 let orbitVertices = [];
+let labels = new Map();
+let projectionMatrix;
 getSatellites();
+resize();
 function frame(now) {
-    const satVertices = generateSatelliteVertices(satellites, Date.now());
-    gl.bindBuffer(gl.ARRAY_BUFFER, satVBO);
-    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(satVertices), gl.DYNAMIC_DRAW);
     gl.clear(gl.COLOR_BUFFER_BIT);
     gl.bindBuffer(gl.ARRAY_BUFFER, orbitsVBO);
     gl.vertexAttribPointer(aPositionLoc, 3, gl.FLOAT, false, 0, 0);
     gl.uniform4f(uColorLoc, 1.0, 1.0, 1.0, 0.1);
     let offset = 0;
-    for (const satellite of satellites) {
+    satellites.forEach(() => {
         gl.drawArrays(gl.LINE_STRIP, offset, numberOfSegments + 1);
         offset += numberOfSegments + 1;
-    }
+    });
+    const satVertices = generateSatelliteVertices(satellites, Date.now());
+    gl.bindBuffer(gl.ARRAY_BUFFER, satVBO);
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(satVertices), gl.DYNAMIC_DRAW);
     gl.bindBuffer(gl.ARRAY_BUFFER, satVBO);
     gl.vertexAttribPointer(aPositionLoc, 3, gl.FLOAT, false, 0, 0);
     gl.uniform1f(uPointSizeLoc, px);
     gl.uniform4f(uColorLoc, 0.0, 0.85, 1.0, 1.0);
     gl.drawArrays(gl.POINTS, 0, satellites.length);
+    satellites.forEach((satellite, index) => {
+        const pos = satVertices.slice(index * 3, index * 3 + 3);
+        const [screenX, screenY] = worldToScreen(pos, projectionMatrix);
+        if (!labels.has(index)) {
+            const label = document.createElement("div");
+            label.style.position = "absolute";
+            label.style.cursor = "help";
+            label.style.color = "rgba(255, 255, 255, 0.1)";
+            label.onclick = (e) => { window.open(`https://celestrak.org/satcat/table-satcat.php?INTDES=${satellite.id}&MAX=1`, '_blank'); };
+            label.onmouseover = () => { label.style.color = "white"; };
+            label.onmouseout = () => { label.style.color = "rgba(255, 255, 255, 0.1)"; };
+            labelContainer.appendChild(label);
+            labels.set(index, label);
+        }
+        const label = labels.get(index);
+        label.textContent = `${satellite.name} (${satellite.id}) (${Math.round(magnitude(satellite.velocity) * 10) / 10} km/s)`;
+        label.style.transform = `translate(${screenX}px, ${screenY}px) translate(-50%, -100%)`;
+    });
     requestAnimationFrame(frame);
 }
 requestAnimationFrame(frame);
