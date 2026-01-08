@@ -3,7 +3,7 @@
   "version": "0.0.1",
   "scripts": {
     "build": "tsc && npm run copy",
-    "serve": "live-server dist",
+    "serve": "live-server dist --no-browser",
     "dev": "tsc --watch",
     "release": "tsc --sourceMap false --removeComments true && npm run copy",
     "copy": "cp index.html dist/"
