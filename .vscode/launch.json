@@ -5,20 +5,12 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "Edge",
+            "name": "Run",
             "request": "launch",
             "type": "msedge",
             "url": "http://localhost:8080",
             "webRoot": "${workspaceFolder}/dist",
             "sourceMaps": true,
-            "preLaunchTask": "build"
         }
-    ],
-    "compounds": [
-    {
-      "name": "Run",
-      "configurations": ["Edge"],
-      "preLaunchTask": "serve"
-    }
-  ]
+    ]
 }

@@ -12,9 +12,21 @@
       }
     },
     {
+      "label": "launch",
+      "dependsOn": ["serve", "watch"],
+      "isBackground": true,
+    },
+    {
       "label": "serve",
-      "type": "shell",
-      "command": "npm run dev; live-server dist --no-browser",
+      "type": "npm",
+      "script": "serve",
+      "problemMatcher": [],
+      "isBackground": true,
+    },
+    {
+      "label": "watch",
+      "type": "npm",
+      "script": "dev",
       "isBackground": true,
       "problemMatcher": ["$tsc-watch"],
     },
